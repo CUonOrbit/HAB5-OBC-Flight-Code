@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "HAB5-OBC",
+            "type": "stlinkgdbtarget",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "preBuild": "${command:st-stm32-ide-debug-launch.build}",
+            "runEntry": "main",
+            "imagesAndSymbols": [
+                {
+                    "imageFileName": "${workspaceFolder}/build/Debug/HAB5-OBC-Flight-Code.elf"
+                }
+            ],
+            "serverSemihosting": {
+                "enabled": true,
+                "mode": "console",
+                "port": "61260"
+            }
+        }
+    ]
+}
