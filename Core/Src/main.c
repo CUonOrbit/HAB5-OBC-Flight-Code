@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "bmp280.h"
+#include "led.h"
 #include "foo.h" //TEMPLATE: need to import our template foo component header file
 #include "scheduler.h"
 extern void initialise_monitor_handles(void);
@@ -57,6 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
+static void Task_LED(void);
 static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
 /* USER CODE END PFP */
 
@@ -95,7 +97,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  Scheduler_Init();
   /* USER CODE BEGIN 2 */
   // Initialize the BMP280 barometer.
   if (BMP280_Init(&baro, &hi2c1, 1000) == HAL_OK)
@@ -122,7 +123,15 @@ int main(void)
   }
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
   Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
+  Scheduler_AddTask(Task_LED, 50, "led"); // Add LED update task to scheduler
   
+  //LED test code
+  LED_Blink(0, 100); // Blink LED3 every 500 ms
+  LED_Blink(1, 500);
+  LED_Blink(2, 1000);
+  LED_Blink(3, 333);
+  LED_On(4); // Turn on LED5
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -220,12 +229,34 @@ static void MX_I2C1_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LED4_Pin|LED5_Pin|LED6_Pin|LED7_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, LED3_Pin|LED0_Pin|LED1_Pin|LED2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : LED4_Pin LED5_Pin LED6_Pin LED7_Pin */
+  GPIO_InitStruct.Pin = LED4_Pin|LED5_Pin|LED6_Pin|LED7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LED3_Pin LED0_Pin LED1_Pin LED2_Pin */
+  GPIO_InitStruct.Pin = LED3_Pin|LED0_Pin|LED1_Pin|LED2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -237,6 +268,10 @@ static void Task_BMP280(void)
 {
     BMP280_Update(&baro);
     printf("Temp: %.2f C  Pressure: %.1f Pa\r\n", BMP280_GetTempC(&baro), BMP280_GetPressurePa(&baro));
+}
+
+static void Task_LED(void) {
+  LED_Update();
 }
 //TEMPLATE: here, we define what happens during the foo task in the main loop. 
 static void Task_FOO(void)        

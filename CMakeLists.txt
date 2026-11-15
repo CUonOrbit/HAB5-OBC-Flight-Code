@@ -55,6 +55,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/bmp280.c
     Core/Src/scheduler.c
     Core/Src/foo.c #TEMPLATE: Need to add new c files here to build properly!
+    Core/Src/led.c
 )
 
 # Add include paths
