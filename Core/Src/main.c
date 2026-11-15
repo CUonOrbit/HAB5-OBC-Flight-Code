@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "bmp280.h"
+#include "foo.h" //TEMPLATE: need to import our template foo component header file
 #include "scheduler.h"
 extern void initialise_monitor_handles(void);
 /* USER CODE END Includes */
@@ -47,6 +48,7 @@ I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
 BMP280_HandleTypeDef baro;
+FOO_HandleTypeDef foo; //TEMPLATE: we add a PV for foo
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,6 +57,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
+static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,12 +97,32 @@ int main(void)
   MX_I2C1_Init();
   Scheduler_Init();
   /* USER CODE BEGIN 2 */
-  if (BMP280_Init(&baro, &hi2c1, 1000) != HAL_OK)
+  // Initialize the BMP280 barometer.
+  if (BMP280_Init(&baro, &hi2c1, 1000) == HAL_OK)
   {
-    /* Sensor not responding - check wiring/address (0x76 vs 0x77) */
-    Error_Handler();
+    Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
+  }
+  else
+  {
+    printf("BMP280 init failed - check wiring/address (0x76 vs 0x77)\r\n");
+  }
+
+   /* TEMPLATE: initialize the component.
+     &foo     - pointer to the handle that FOO_Init fills in
+     &hi2c1   - which I2C bus the sensor is on
+     0x68<<1  - sensor's 7-bit I2C address, shifted left 1 because HAL expects that
+     Only schedule the task if init succeeded. */
+  if (FOO_Init(&foo, &hi2c1, 0x68 << 1) == HAL_OK)
+  {
+    Scheduler_AddTask(Task_FOO, 100, "foo");
+  }
+  else
+  {
+    printf("FOO init failed - check wiring/address\r\n");
   }
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
+  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -214,6 +237,12 @@ static void Task_BMP280(void)
 {
     BMP280_Update(&baro);
     printf("Temp: %.2f C  Pressure: %.1f Pa\r\n", BMP280_GetTempC(&baro), BMP280_GetPressurePa(&baro));
+}
+//TEMPLATE: here, we define what happens during the foo task in the main loop. 
+static void Task_FOO(void)        
+{
+  FOO_Update(&foo);
+  printf("foo: %.3f\r\n", FOO_GetSomeRandomData(&foo));
 }
 /* USER CODE END 4 */
 
