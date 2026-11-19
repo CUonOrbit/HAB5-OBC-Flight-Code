@@ -26,6 +26,11 @@
 #include "bmp280.h"
 #include "foo.h" //TEMPLATE: need to import our template foo component header file
 #include "scheduler.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
+
 extern void initialise_monitor_handles(void);
 /* USER CODE END Includes */
 
@@ -52,6 +57,12 @@ SPI_HandleTypeDef hspi1;
 /* USER CODE BEGIN PV */
 BMP280_HandleTypeDef baro;
 FOO_HandleTypeDef foo; //TEMPLATE: we add a PV for foo
+
+FATFS fs;           // Work area (file system object)
+FIL fil;            // File object
+FRESULT fresult;    // File function return code
+UINT bw, br;        // File write/read byte counts
+char read_buf[64];  // Buffer for reading back data
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,11 +73,22 @@ static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
 static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void myprintf(const char *fmt, ...) {
+  static char buffer[256];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buffer, sizeof(buffer), fmt, args);
+  va_end(args);
 
+  printf("%s", buffer);
+  fflush(stdout);
+}
 /* USER CODE END 0 */
 
 /**
@@ -139,8 +161,66 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+  myprintf("\r\n~ SD card demo by kiwih ~\r\n\r\n");
+
+  HAL_Delay(1000); //a short delay is important to let the SD card settle
+
+  //some variables for FatFs
+  FATFS FatFs; 	//Fatfs handle
+  FIL fil; 		//File handle
+  FRESULT fres; //Result after operations
+
+  //Open the file system
+  fres = f_mount(&FatFs, "", 1); //1=mount now
+  if (fres != FR_OK) {
+    myprintf("f_mount error (%i)\r\n", fres);
+    while(1);
   }
+
+  //Let's get some statistics from the SD card
+  DWORD free_clusters, free_sectors, total_sectors;
+
+  FATFS* getFreeFs;
+
+  fres = f_getfree("", &free_clusters, &getFreeFs);
+  if (fres != FR_OK) {
+  myprintf("f_getfree error (%i)\r\n", fres);
+  while(1);
+  }
+
+  //Formula comes from ChaN's documentation
+  total_sectors = (getFreeFs->n_fatent - 2) * getFreeFs->csize;
+  free_sectors = free_clusters * getFreeFs->csize;
+
+  myprintf("SD card stats:\r\n%10lu KiB total drive space.\r\n%10lu KiB available.\r\n", total_sectors / 2, free_sectors / 2);
+
+  //Now let's try to open file "test.txt"
+  fres = f_open(&fil, "test.txt", FA_READ);
+  if (fres != FR_OK) {
+  myprintf("f_open error (%i)\r\n", fres);
+  while(1);
+  }
+  myprintf("I was able to open 'test.txt' for reading!\r\n");
+
+  //Read 30 bytes from "test.txt" on the SD card
+  BYTE readBuf[30];
+
+  //We can either use f_read OR f_gets to get data out of files
+  //f_gets is a wrapper on f_read that does some string formatting for us
+  TCHAR* rres = f_gets((TCHAR*)readBuf, 30, &fil);
+  if(rres != 0) {
+  myprintf("Read string from 'test.txt' contents: %s\r\n", readBuf);
+  } else {
+  myprintf("f_gets error (%i)\r\n", fres);
+  }
+
+  //Be a tidy kiwi - don't forget to close your file!
+  f_close(&fil);
+
+  //We're done, so de-mount the drive
+  f_mount(NULL, "", 0);
   /* USER CODE END 3 */
+}
 }
 
 /**
@@ -278,7 +358,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : SPI1_CS_Pin */
   GPIO_InitStruct.Pin = SPI1_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(SPI1_CS_GPIO_Port, &GPIO_InitStruct);
 

@@ -61,7 +61,8 @@ void Error_Handler(void);
 #define SPI1_CS_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+#define SD_SPI_HANDLE hspi1
+void myprintf(const char *fmt, ...);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
