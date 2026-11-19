@@ -1,4 +1,7 @@
 #include "microsd.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
 
 static FATFS FatFs; 	//Fatfs handle
 static FIL fil; 		//File handle
@@ -58,5 +61,39 @@ void MICROSD_Demo(void)
   f_close(&fil);
 
   //We're done, so de-mount the drive
+  f_mount(NULL, "", 0);
+}
+
+void MICROSD_WriteTest(void)
+{
+  UINT bytesWritten;
+  const char *text = "Hello testing testing HAB5\r\n";
+
+  // 1. Mount
+  fres = f_mount(&FatFs, "",  1);
+  if(fres != FR_OK){
+    myprintf("f_mount error (%i)\r\n", fres);
+    return;
+  }
+
+  // 2. Create new file and overwrite if need be
+  fres = f_open(&fil, "flight.txt", FA_WRITE | FA_CREATE_ALWAYS);
+  if(fres != FR_OK){
+    myprintf("f_open error (%i)\r\n", fres);
+    f_mount(NULL, "", 0);
+    return;
+  } 
+
+  // 3. Write to
+  fres = f_write(&fil, text, strlen(text), &bytesWritten);
+  if(fres != FR_OK || bytesWritten < strlen(text)) {
+    myprintf("f_write error (%i)\r\n", fres);
+  }
+  else{
+    myprintf("Wrote %u bytes successfully!\r\n", bytesWritten);
+  }
+
+  //4. Close ("flushes" data to SD?) and unmount
+  f_close(&fil);
   f_mount(NULL, "", 0);
 }
