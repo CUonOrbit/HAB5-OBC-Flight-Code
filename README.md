@@ -11,6 +11,55 @@ This software is intended to run on the STM32F411CEU6 MCU.
 - Select Debug or Release build configuration when prompted (likely debug if doing development)
 - Command Palette "CMake: Delete Cache and Reconfigure"
 - Should build with "CMake: Build" build task
+
+## Pinout
+
+Pin assignments for the HAB5-OBC board (STM32F411CEU6, UFQFPN-48). Configure these in the `.ioc` file; drivers only receive peripheral handles and never set up pins themselves.
+
+| Pin | Function | Notes |
+|---|---|---|
+| PA0 | ADC1_IN0 | LMT84LPM temperature sensor |
+| PA1 | ADC1_IN1 | NTC divider |
+| PA2 | EXTRA_GPIO_0 | Spare |
+| PA3 | GPIO_EXTI3 | IMU INT2 |
+| PA4 | SPI1_NSS | |
+| PA5 | SPI1_SCK | |
+| PA6 | SPI1_MISO | |
+| PA7 | SPI1_MOSI | |
+| PA8 | LED3 | |
+| PA9 | USART1_TX | |
+| PA10 | USART1_RX | |
+| PA11 | LED0 | |
+| PA12 | LED1 | |
+| PA13 | SWDIO | Debug, do not reassign |
+| PA14 | SWCLK | Debug, do not reassign |
+| PA15 | LED2 | |
+| PB0 | GPIO_EXTI0 | IMU INT1 |
+| PB1 | LED4 | |
+| PB2 | LED5 | |
+| PB3 | I2C2_SDA | AF9, open-drain (see notes) |
+| PB4 | GPIO_EXTI4 | |
+| PB5 | GPIO_EXTI5 | |
+| PB6 | I2C1_SCL | |
+| PB7 | I2C1_SDA | |
+| PB8 | LED6 | |
+| PB9 | LED7 | |
+| PB10 | I2C2_SCL | AF4 |
+| PB12 | SPI2_NSS | |
+| PB13 | SPI2_SCK | |
+| PB14 | SPI2_MISO | |
+| PB15 | SPI2_MOSI | |
+| PC13 | EXTRA_GPIO_1 | Spare, low drive (see notes) |
+| PH0 | RCC_OSC_IN | |
+| PH1 | RCC_OSC_OUT | |
+| NRST | NRST | |
+
+**Notes**
+- **I2C2** is used by the IMU, which plugs into female headers as a breakout board.
+- **PB3** resets as JTAG `JTDO`/`TRACESWO`. It must be set to AF9 (I2C2_SDA) in CubeMX, which means SWO trace is unavailable. SWD and semihosting still work.
+- **PC13** is in the backup domain: max ~3 mA sink, 2 MHz, and it can't source current. Don't drive LEDs or loads from it.
+- **EXTI lines** are shared across ports by pin number (e.g. PA3 and PB3 both use EXTI3). PB3 is I2C, so it doesn't conflict with PA3. Before adding a new interrupt pin, check that its line number isn't already taken (0, 3, 4, 5 are in use).
+
 ## Adding a New Component
  
 Each component (sensor, data logger, radio, etc.) is a driver made of a header (`.h`) and an implementation (`.c`) file. Its update function runs from a task in the scheduler. Use `foo.h`, `foo.c` and the `TEMPLATE` comments in `main.c` as a guide. Copy them and rename `foo`/`FOO` to your component's name.
@@ -85,4 +134,3 @@ After editing `CMakeLists.txt`, reconfigure if VS Code doesn't do it automatical
  
 ### Debug output
 `printf` goes through semihosting (`rdimon`). It only produces output while a debugger is attached with semihosting enabled, and it may halt the board when no debugger is connected.
- 
