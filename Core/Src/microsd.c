@@ -7,6 +7,8 @@ static FATFS FatFs; 	//Fatfs handle
 static FIL fil; 		//File handle
 static FRESULT fres; //Result after operations
 
+MICROSD_Buffer buffer[BUFFER_CAPACITY];
+
 void MICROSD_Demo(void)
 {
   myprintf("\r\n~ SD card demo by kiwih ~\r\n\r\n");
@@ -94,6 +96,36 @@ void MICROSD_WriteTest(void)
   }
 
   //4. Close ("flushes" data to SD?) and unmount
+  f_close(&fil);
+  f_mount(NULL, "", 0);
+}
+
+void MICROSD_CSVTest(void){
+  UINT bytesWritten;
+
+  const char *text = "COL1,COL2,COL3,COL4\r\na,b,c,d\r\ne,f,g,h\r\ni,j,k,l\r\n";
+
+  fres = f_mount(&FatFs, "",  1);
+  if(fres != FR_OK){
+    myprintf("f_mount error (%i)\r\n", fres);
+    return;
+  }
+
+  fres = f_open(&fil, "data.csv", FA_WRITE | FA_CREATE_ALWAYS);
+  if(fres != FR_OK){
+    myprintf("f_open error (%i)\r\n", fres);
+    f_mount(NULL, "", 0);
+    return;
+  } 
+
+  fres = f_write(&fil, text, strlen(text), &bytesWritten);
+  if(fres != FR_OK || bytesWritten < strlen(text)) {
+    myprintf("f_write error (%i)\r\n", fres);
+  }
+  else{
+    myprintf("Wrote %u bytes successfully!\r\n", bytesWritten);
+  }
+
   f_close(&fil);
   f_mount(NULL, "", 0);
 }

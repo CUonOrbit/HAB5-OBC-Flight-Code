@@ -145,7 +145,8 @@ int main(void)
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
   Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
   
-  MICROSD_WriteTest();
+  //MICROSD_WriteTest();
+  MICROSD_CSVTest();
   //MICROSD_Demo();
   /* USER CODE END 2 */
 
