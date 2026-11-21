@@ -7,7 +7,9 @@ static FATFS FatFs; 	//Fatfs handle
 static FIL fil; 		//File handle
 static FRESULT fres; //Result after operations
 
-MICROSD_Buffer buffer[BUFFER_CAPACITY];
+static MICROSD_Buffer current_row = {0};
+static MICROSD_Buffer buffer[BUFFER_CAPACITY];
+static uint8_t buffer_index = 0;
 
 void MICROSD_Demo(void)
 {
@@ -128,4 +130,52 @@ void MICROSD_CSVTest(void){
 
   f_close(&fil);
   f_mount(NULL, "", 0);
+}
+
+FRESULT MICROSD_Init(void){
+  fres = f_mount(&FatFs, "",  1);
+  if(fres != FR_OK){
+    myprintf("f_mount error (%i)\r\n", fres);
+    return fres;
+  }
+
+  fres = f_open(&fil, "HAB5-MICROSD-DATA.csv", FA_WRITE | FA_CREATE_ALWAYS);
+  if(fres != FR_OK){
+    myprintf("f_open error (%i)\r\n", fres);
+    f_mount(NULL, "", 0);
+    return fres;
+  } 
+}
+
+FRESULT MICROSD_Sync(void){
+  fres = f_sync();
+  if(fres != FR_OK){
+    myprintf("f_sync error (%i)\r\n", fres);
+    return fres;
+  }
+}
+
+void MICROSD_SetCol1(float val){
+  current_row.col1 = val; 
+}
+
+void MICROSD_SetCol2(float val){
+  current_row.col2 = val; 
+}
+
+void MICROSD_SetCol3(float val){
+  current_row.col3 = val; 
+}
+
+void MICROSD_SetCol4(float val){
+  current_row.col4 = val; 
+}
+
+void MICROSD_SaveEntries(void) {
+    buffer[buffer_index] = current_row;
+    buffer_index++;
+    if (buffer_index >= BUFFER_CAPACITY) {
+        MICROSD_Sync();
+        buffer_index = 0;
+    }
 }
