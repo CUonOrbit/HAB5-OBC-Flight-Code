@@ -25,6 +25,8 @@
 #include "bmp280.h"
 #include "foo.h" //TEMPLATE: need to import our template foo component header file
 #include "scheduler.h"
+#include "w25q128.h"
+#include "nvstore.h"
 extern void initialise_monitor_handles(void);
 /* USER CODE END Includes */
 
@@ -35,6 +37,10 @@ extern void initialise_monitor_handles(void);
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/* Set to 1 to run the flash erase/write/read-back test at startup.
+   It ERASES the last 4 KiB sector of the flash, so leave it 0 once
+   that sector holds data you care about. */
+#define FLASH_RUN_SELF_TEST 1
 
 /* USER CODE END PD */
 
@@ -46,15 +52,20 @@ extern void initialise_monitor_handles(void);
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi2;
+
 /* USER CODE BEGIN PV */
 BMP280_HandleTypeDef baro;
 FOO_HandleTypeDef foo; //TEMPLATE: we add a PV for foo
+W25Q128_HandleTypeDef flash;
+NVSTORE_HandleTypeDef nv;   /* non-volatile vars (boot count, battery usage, ...) */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
 static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
@@ -95,8 +106,49 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  Scheduler_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
+  Scheduler_Init();
+
+  /* W25Q128 NOR flash on SPI2. Chip select is PB12, labelled FLASH_CS in the .ioc
+     and configured as a plain GPIO output (not hardware NSS); the driver drives it.
+     No scheduler task: flash has no periodic job of its own. Other components
+     call W25Q128_Read/Write/Erase when they need to log or fetch data. */
+  if (W25Q128_Init(&flash, &hspi2, FLASH_CS_GPIO_Port, FLASH_CS_Pin) == HAL_OK)
+  {
+    printf("W25Q128 OK, %lu bytes\r\n", (unsigned long)W25Q128_GetCapacity(&flash));
+#if FLASH_RUN_SELF_TEST
+    uint32_t test_sector = W25Q128_GetCapacity(&flash) - W25Q128_SECTOR_SIZE;
+    W25Q128_TestResult result = W25Q128_SelfTest(&flash, test_sector);
+    printf("W25Q128 self-test @0x%06lX: %s\r\n", (unsigned long)test_sector,
+           W25Q128_TestResultToString(result));
+#endif
+
+    /* Non-volatile variables live in the first 8 KiB of the flash.
+       Count this boot and save it straight away. */
+    if (NVSTORE_Init(&nv, &flash) == HAL_OK)
+    {
+      NVSTORE_Set(&nv, NV_BOOT_COUNT, NVSTORE_Get(&nv, NV_BOOT_COUNT) + 1);
+      if (NVSTORE_Save(&nv) != HAL_OK)
+      {
+        printf("NVSTORE save failed\r\n");
+      }
+      printf("Boot count: %lu  Battery usage: %lu\r\n",
+             (unsigned long)NVSTORE_Get(&nv, NV_BOOT_COUNT),
+             (unsigned long)NVSTORE_Get(&nv, NV_BATTERY_USAGE));
+    }
+    else
+    {
+      printf("NVSTORE init failed\r\n");
+    }
+  }
+  else
+  {
+    const uint8_t *id = W25Q128_GetJedecId(&flash);
+    printf("W25Q128 init failed - JEDEC ID %02X %02X %02X (expected EF 40 18). "
+           "FF FF FF / 00 00 00 = check wiring/CS\r\n", id[0], id[1], id[2]);
+  }
+
   // Initialize the BMP280 barometer.
   if (BMP280_Init(&baro, &hi2c1, 1000) == HAL_OK)
   {
@@ -120,8 +172,6 @@ int main(void)
   {
     printf("FOO init failed - check wiring/address\r\n");
   }
-  Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
-  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
   
   /* USER CODE END 2 */
 
@@ -214,18 +264,67 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin : FLASH_CS_Pin */
+  GPIO_InitStruct.Pin = FLASH_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(FLASH_CS_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

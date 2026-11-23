@@ -54,6 +54,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/bmp280.c
     Core/Src/scheduler.c
+    Core/Src/w25q128.c
+    Core/Src/nvstore.c
     Core/Src/foo.c #TEMPLATE: Need to add new c files here to build properly!
 )
 
