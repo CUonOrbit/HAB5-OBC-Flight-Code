@@ -22,7 +22,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <math.h>
 #include "bmp280.h"
+#include "logbuffer.h"
 #include "foo.h" //TEMPLATE: need to import our template foo component header file
 #include "scheduler.h"
 extern void initialise_monitor_handles(void);
@@ -49,6 +51,7 @@ I2C_HandleTypeDef hi2c1;
 /* USER CODE BEGIN PV */
 BMP280_HandleTypeDef baro;
 FOO_HandleTypeDef foo; //TEMPLATE: we add a PV for foo
+LOGBUF_HandleTypeDef logbuf;   /* logs waiting for the next 5 s storage write */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +61,8 @@ static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
 static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
+static void Task_LogSample(void);
+static void Task_LogFlush(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -121,8 +126,16 @@ int main(void)
     printf("FOO init failed - check wiring/address\r\n");
   }
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
-  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
-  
+  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule
+
+  /* Logging: snapshot every sensor at 12.5 Hz into the buffer, and write the
+     buffer to storage every 5 s. Added after the sensor tasks so that when
+     they're due in the same loop pass, the sensors update first and the log
+     gets the newest values. */
+  LOGBUF_Init(&logbuf);
+  Scheduler_AddTask(Task_LogSample, LOG_SAMPLE_PERIOD_MS, "log_sample");
+  Scheduler_AddTask(Task_LogFlush,  LOG_FLUSH_PERIOD_MS,  "log_flush");
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -243,6 +256,57 @@ static void Task_FOO(void)
 {
   FOO_Update(&foo);
   printf("foo: %.3f\r\n", FOO_GetSomeRandomData(&foo));
+}
+
+/*
+ * Build one log from the latest cached value of every sensor.
+ * Each sensor's own task updates its handle at that sensor's rate; the
+ * getters just return the cached value. So a sensor that hasn't produced a
+ * new reading since the last log simply repeats its previous one.
+ *
+ * TODO: as each sensor driver is added, replace its NAN with its getter.
+ * NAN (not 0) means "no data" shows up clearly in post-flight analysis.
+ */
+static void Task_LogSample(void)
+{
+  LOG_Entry e;
+
+  e.timestamp_ms         = HAL_GetTick();
+
+  e.lmt84_temp_c         = NAN;  /* LMT84_GetTempC(&lmt84)          */
+  e.mcp9808_temp_c       = NAN;  /* MCP9808_GetTempC(&mcp9808)      */
+  e.ntc_temp_c           = NAN;  /* NTC_GetTempC(&ntc)              */
+
+  e.ms5611_pressure_mbar = NAN;  /* MS5611_GetPressureMbar(&ms5611) */
+  e.ms5611_temp_c        = NAN;  /* MS5611_GetTempC(&ms5611)        */
+
+  e.ina228_bus_v         = NAN;  /* INA228_GetBusVoltage(&ina228)   */
+  e.ina228_current_ma    = NAN;  /* INA228_GetCurrentmA(&ina228)    */
+  e.ina228_power_mw      = NAN;  /* INA228_GetPowermW(&ina228)      */
+
+  for (int i = 0; i < 3; i++)
+  {
+    e.imu_accel_g[i]     = NAN;  /* IMU_GetAccelG(&imu, i)          */
+    e.imu_gyro_dps[i]    = NAN;  /* IMU_GetGyroDps(&imu, i)         */
+  }
+
+  LOGBUF_Add(&logbuf, &e);       /* if full, it's dropped and counted */
+}
+
+/*
+ * Hand the whole buffer to each storage device, then empty it.
+ * Expect ~62-63 logs per flush (5000 ms / 80 ms).
+ */
+static void Task_LogFlush(void)
+{
+  /* Once they exist, add the writers once the drivers exist on this branch, e.g.
+       W25Q128_WriteLogs(&flash, &logbuf);
+       SD_WriteLogs(&sd, &logbuf);                                        */
+
+  printf("Log flush: %u logs, %lu dropped total\r\n",
+         (unsigned)LOGBUF_GetCount(&logbuf), (unsigned long)LOGBUF_GetDropped(&logbuf));
+
+  LOGBUF_Clear(&logbuf);
 }
 /* USER CODE END 4 */
 
