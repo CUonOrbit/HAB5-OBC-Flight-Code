@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "bmp280.h"
+#include "mcp9808.h"
 #include "scheduler.h"
 extern void initialise_monitor_handles(void);
 /* USER CODE END Includes */
@@ -55,6 +56,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
+static void Task_MCP9808(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -100,12 +102,26 @@ int main(void)
     Error_Handler();
   }
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
+
+  // Verify MCP9808 is responding
+  if (HAL_I2C_IsDeviceReady(&hi2c1, MCP9808_ADDR, 3, 100) != HAL_OK)
+  {
+      Error_Handler();
+  }
+
+    printf("MCP9808 initialized\r\n");
+    fflush(stdout);
+
+    Scheduler_AddTask(Task_MCP9808, 1000, "mcp9808");
+
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    printf("MCP9808 initialized\r\n");
     Scheduler_Update();
     //printf("Temp: %.2f C  Pressure: %.1f Pa\r\n", BMP280_GetTempC(&baro), BMP280_GetPressurePa(&baro));
     /* USER CODE END WHILE */
@@ -214,6 +230,20 @@ static void Task_BMP280(void)
 {
     BMP280_Update(&baro);
     printf("Temp: %.2f C  Pressure: %.1f Pa\r\n", BMP280_GetTempC(&baro), BMP280_GetPressurePa(&baro));
+}
+
+static void Task_MCP9808(void)
+{
+    float temperature_c;
+
+    if (MCP9808_ReadTemp(&hi2c1, &temperature_c) == HAL_OK)
+    {
+        printf("MCP9808 Temp: %.2f C\r\n", temperature_c);
+    }
+    else
+    {
+        printf("MCP9808 read failed\r\n");
+    }
 }
 /* USER CODE END 4 */
 
