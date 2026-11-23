@@ -141,15 +141,12 @@ int main(void)
      Only schedule the task if init succeeded. */
   if (FOO_Init(&foo, &hi2c1, 0x68 << 1) == HAL_OK)
   {
-    Scheduler_AddTask(Task_FOO, 100, "foo");
+    Scheduler_AddTask(Task_FOO, 1000, "foo");
   }
   else
   {
     printf("FOO init failed - check wiring/address\r\n");
   }
-  Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
-  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule
-
   /* Logging: snapshot every sensor at 12.5 Hz into the buffer, and write the
      buffer to storage every 5 s. Added after the sensor tasks so that when
      they're due in the same loop pass, the sensors update first and the log
