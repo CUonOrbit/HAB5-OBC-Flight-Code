@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include "bmp280.h"
 #include "foo.h" //TEMPLATE: need to import our template foo component header file
+#include "ina228.h"
 #include "scheduler.h"
 extern void initialise_monitor_handles(void);
 /* USER CODE END Includes */
@@ -35,6 +36,10 @@ extern void initialise_monitor_handles(void);
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+/* INA228 power monitor - TODO: confirm against the PCB */
+#define INA228_ADDR           (0x40 << 1)  /* A0 = A1 = GND */
+#define INA228_SHUNT_OHMS     0.01f        /* shunt resistor value */
+#define INA228_MAX_CURRENT_A  3.0f         /* largest expected current */
 
 /* USER CODE END PD */
 
@@ -49,6 +54,7 @@ I2C_HandleTypeDef hi2c1;
 /* USER CODE BEGIN PV */
 BMP280_HandleTypeDef baro;
 FOO_HandleTypeDef foo; //TEMPLATE: we add a PV for foo
+INA228_HandleTypeDef power_mon;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +64,7 @@ static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 static void Task_BMP280(void);
 static void Task_FOO(void); //TEMPLATE: we add a task for the foo componenet to be run in the main loop
+static void Task_INA228(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -114,14 +121,24 @@ int main(void)
      Only schedule the task if init succeeded. */
   if (FOO_Init(&foo, &hi2c1, 0x68 << 1) == HAL_OK)
   {
-    Scheduler_AddTask(Task_FOO, 100, "foo");
+    Scheduler_AddTask(Task_FOO, 1000, "foo");
   }
   else
   {
     printf("FOO init failed - check wiring/address\r\n");
   }
-  Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
-  Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
+
+  // Initialize the INA228 power monitor.
+  if (INA228_Init(&power_mon, &hi2c1, INA228_ADDR, INA228_SHUNT_OHMS, INA228_MAX_CURRENT_A) == HAL_OK)
+  {
+    Scheduler_AddTask(Task_INA228, 1000, "ina228");
+  }
+  else
+  {
+    printf("INA228 init failed - check wiring/address/shunt config\r\n");
+  }
+  //Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
+  //Scheduler_AddTask(Task_FOO,     1000, "foo"); //TEMPLATE: we add the foo task to our schedule 
   
   /* USER CODE END 2 */
 
@@ -243,6 +260,14 @@ static void Task_FOO(void)
 {
   FOO_Update(&foo);
   printf("foo: %.3f\r\n", FOO_GetSomeRandomData(&foo));
+}
+
+static void Task_INA228(void)
+{
+  INA228_Update(&power_mon);
+  printf("Bus: %.3f V  I: %.3f A  P: %.3f W  Used: %.1f mAh\r\n",
+         INA228_GetBusVoltage(&power_mon), INA228_GetCurrent(&power_mon),
+         INA228_GetPower(&power_mon), INA228_GetChargeUsed_mAh(&power_mon));
 }
 /* USER CODE END 4 */
 
