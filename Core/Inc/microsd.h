@@ -3,32 +3,11 @@
 
 #include "main.h"
 #include "fatfs.h"
+#include "logbuffer.h"
 
-#define BUFFER_CAPACITY 20
-
-typedef struct {
-    float col1;
-    float col2;
-    float col3;
-    float col4;
-} MICROSD_Buffer;
-
-// Tests
-void MICROSD_Demo(void);
-void MICROSD_WriteTest(void);
-void MICROSD_CSVTest(void);
-
-// Core 
 FRESULT MICROSD_Init(void); // Mount microSD card, then create CSV file and leave open.
-FRESULT MICROSD_WriteTo(void); // Write to the CSV.
-void MICROSD_SaveEntries(void); // Save current entries to buffer and shift its index up.
+FRESULT MICROSD_WriteTo(const LOGBUF_HandleTypeDef *buf); // Write to the CSV.
 FRESULT MICROSD_Sync(void); // Flush cached data. Will reset the buffer index?
 FRESULT MICROSD_Unmount(void); // Close and unmount volume.
-
-// Setters
-void MICROSD_SetCol1(float val);
-void MICROSD_SetCol2(float val);
-void MICROSD_SetCol3(float val);
-void MICROSD_SetCol4(float val);
 
 #endif

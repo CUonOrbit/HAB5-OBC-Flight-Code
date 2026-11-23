@@ -121,6 +121,8 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_FATFS_Init();
+
+  MICROSD_Init();
   /* USER CODE BEGIN 2 */
   // Initialize the BMP280 barometer.
   if (BMP280_Init(&baro, &hi2c1, 1000) == HAL_OK)
@@ -372,7 +374,10 @@ static void Task_LogFlush(void)
 
   printf("Log flush: %u logs, %lu dropped total\r\n",
          (unsigned)LOGBUF_GetCount(&logbuf), (unsigned long)LOGBUF_GetDropped(&logbuf));
-
+  
+  MICROSD_WriteTo(&logbuf);
+  MICROSD_Sync();
+  
   LOGBUF_Clear(&logbuf);
 }
 /* USER CODE END 4 */
