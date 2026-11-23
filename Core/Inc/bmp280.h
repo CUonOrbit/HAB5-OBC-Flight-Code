@@ -4,7 +4,7 @@
 #include "main.h"
 
 /* SDO tied to GND = 0x76, SDO tied to VDD = 0x77.
-   Adafruit breakout default is usually 0x77 - verify against your board. */
+   Adafruit breakout default is usually 0x77 - verify against board. */
 #define BMP280_I2C_ADDR   (0x77 << 1)
 
 typedef struct {
