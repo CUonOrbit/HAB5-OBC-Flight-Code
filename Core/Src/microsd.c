@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+#define ARR_LEN(arr) (sizeof(arr)) / sizeof((arr[0]))
+
 static FATFS FatFs; 	//Fatfs handle
 static FIL fil; 		//File handle
 static FRESULT fres; //Result after operations
@@ -113,7 +115,7 @@ void MICROSD_CSVTest(void){
     return;
   }
 
-  fres = f_open(&fil, "data.csv", FA_WRITE | FA_CREATE_ALWAYS);
+  fres = f_open(&fil, "data.csv", FA_WRITE | FA_OPEN_ALWAYS);
   if(fres != FR_OK){
     myprintf("f_open error (%i)\r\n", fres);
     f_mount(NULL, "", 0);
@@ -139,20 +141,56 @@ FRESULT MICROSD_Init(void){
     return fres;
   }
 
-  fres = f_open(&fil, "HAB5-MICROSD-DATA.csv", FA_WRITE | FA_CREATE_ALWAYS);
+  fres = f_open(&fil, "HAB5DATA.csv", FA_WRITE | FA_CREATE_NEW);
   if(fres != FR_OK){
     myprintf("f_open error (%i)\r\n", fres);
     f_mount(NULL, "", 0);
     return fres;
   } 
+
+  UINT bw;
+  const char *header = "Col1, Col2, Col3, Col4\r\n";
+  fres = f_write(&fil, header, strlen(header), &bw);
+  if(fres != FR_OK || bw < strlen(header)){
+    myprintf("CSV header write error\r\n");
+    f_close(&fil);
+    f_mount(NULL, "", 0);
+    return fres;
+  }
+  f_sync(&fil);
+
+  return FR_OK;
+}
+
+FRESULT MICROSD_WriteTo(void){
+  char row[100];
+  UINT bw;
+
+  for(int i = 0; i < ARR_LEN(buffer); i++){
+    int len = snprintf(row, sizeof(row), "%f,%f,%f,%f\r\n", buffer[i].col1, buffer[i].col2, buffer[i].col3, buffer[i].col4);
+    fres = f_write(&fil, row, (UINT)len, &bw);
+
+    if(fres != FR_OK){
+      return fres;
+    }
+  }
+
+  buffer_index = 0;
+  return FR_OK;
 }
 
 FRESULT MICROSD_Sync(void){
-  fres = f_sync();
+  fres = f_sync(&fil);
   if(fres != FR_OK){
     myprintf("f_sync error (%i)\r\n", fres);
-    return fres;
   }
+  return fres;
+}
+
+FRESULT MICROSD_Unmount(void){
+  fres = f_close(&fil);
+  fres = f_mount(NULL, "", 0);
+  return fres;
 }
 
 void MICROSD_SetCol1(float val){
@@ -174,8 +212,4 @@ void MICROSD_SetCol4(float val){
 void MICROSD_SaveEntries(void) {
     buffer[buffer_index] = current_row;
     buffer_index++;
-    if (buffer_index >= BUFFER_CAPACITY) {
-        MICROSD_Sync();
-        buffer_index = 0;
-    }
 }

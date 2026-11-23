@@ -20,9 +20,10 @@ void MICROSD_CSVTest(void);
 
 // Core 
 FRESULT MICROSD_Init(void); // Mount microSD card, then create CSV file and leave open.
-FRESULT MICROSD_Sync(void); // Flush cached data.
-FRESULT MICROSD_Unmount(void) // Close and unmount volume.
-void MICROSD_SaveEntries(void); // 
+FRESULT MICROSD_WriteTo(void); // Write to the CSV.
+void MICROSD_SaveEntries(void); // Save current entries to buffer and shift its index up.
+FRESULT MICROSD_Sync(void); // Flush cached data. Will reset the buffer index?
+FRESULT MICROSD_Unmount(void); // Close and unmount volume.
 
 // Setters
 void MICROSD_SetCol1(float val);

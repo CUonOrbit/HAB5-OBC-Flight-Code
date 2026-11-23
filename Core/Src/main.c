@@ -145,9 +145,29 @@ int main(void)
   Scheduler_AddTask(Task_BMP280, 1000, "bmp280");
   Scheduler_AddTask(Task_FOO,     100, "foo"); //TEMPLATE: we add the foo task to our schedule 
   
-  //MICROSD_WriteTest();
-  MICROSD_CSVTest();
-  //MICROSD_Demo();
+  
+  MICROSD_Init();
+
+
+  MICROSD_SetCol1(10);
+  MICROSD_SetCol2(20);
+  MICROSD_SetCol3(30);
+  MICROSD_SetCol4(40);
+
+  MICROSD_SaveEntries();
+
+  MICROSD_SetCol1(11);
+  MICROSD_SetCol2(21);
+  MICROSD_SetCol3(31);
+  MICROSD_SetCol4(41);
+
+  MICROSD_SaveEntries();
+
+  MICROSD_WriteTo();
+  MICROSD_Sync();
+  MICROSD_Unmount();
+
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
