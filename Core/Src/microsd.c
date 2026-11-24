@@ -1,4 +1,5 @@
 #include "microsd.h"
+#include "ff.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -16,7 +17,7 @@ FRESULT MICROSD_Init(void){
     return fres;
   }
 
-  fres = f_open(&fil, "HAB5DATA.csv", FA_WRITE | FA_CREATE_NEW);
+  fres = f_open(&fil, "HAB5DATA.csv", FA_WRITE | FA_CREATE_ALWAYS);
   if(fres != FR_OK){
     myprintf("f_open error (%i)\r\n", fres);
     f_mount(NULL, "", 0);
@@ -24,7 +25,24 @@ FRESULT MICROSD_Init(void){
   } 
 
   UINT bw;
-  const char *header = "timestamp_ms,lmt84_temp_c,mcp9808_temp_c,ntc_temp_c,ms5611_pressure_mbar,ms5611_temp_c,ina228_bus_v,ina228_current_ma,ina228_power_mw,imu_accel_g[0],imu_accel_g[1],imu_accel_g[2],imu_gyro_dps[0],imu_gyro_dps[1],imu_gyro_dps[2]\r\n";
+  const char *header = 
+    "timestamp_ms,
+    lmt84_temp_c,
+    mcp9808_temp_c,
+    ntc_temp_c,
+    ms5611_pressure_mbar,
+    ms5611_temp_c,
+    ina228_bus_v,
+    ina228_current_ma,
+    ina228_power_mw,
+    imu_accel_g[0],
+    imu_accel_g[1],
+    imu_accel_g[2],
+    imu_gyro_dps[0],
+    imu_gyro_dps[1],
+    imu_gyro_dps[2]
+    \r\n";
+
   fres = f_write(&fil, header, strlen(header), &bw);
   if(fres != FR_OK || bw < strlen(header)){
     myprintf("CSV header write error\r\n");
@@ -38,11 +56,19 @@ FRESULT MICROSD_Init(void){
 }
 
 FRESULT MICROSD_WriteTo(const LOGBUF_HandleTypeDef *buf){
-  char row[256];
+  if(buf == NULL || buf->entries == NULL){
+    return FR_INVALID_PARAMETER;
+  }
+  if(fil.obj.fs == NULL){
+    return FR_INVALID_OBJECT;
+  }
+
+  char csv_row[256];
   UINT bw;
 
   for(uint16_t i = 0; i < buf->count; i++){
-    int len = snprintf(row, sizeof(row), "%lu,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\r\n", 
+    int len = snprintf(csv_row, sizeof(csv_row), 
+      "%lu,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\r\n", 
       buf->entries[i].timestamp_ms, 
       buf->entries[i].lmt84_temp_c, 
       buf->entries[i].mcp9808_temp_c, 
@@ -59,10 +85,15 @@ FRESULT MICROSD_WriteTo(const LOGBUF_HandleTypeDef *buf){
       buf->entries[i].imu_gyro_dps[1], 
       buf->entries[i].imu_gyro_dps[2] 
     );
+
+    if(len < 0 || (size_t)len >= sizeof(csv_row)){
+      return FR_INT_ERR;
+    }
     
-    fres = f_write(&fil, row, (UINT)len, &bw);
+    fres = f_write(&fil, csv_row, (UINT)len, &bw);
 
     if(fres != FR_OK){
+      myprintf("f_write error (%i)\r\n", fres);
       return fres;
     }
   }
