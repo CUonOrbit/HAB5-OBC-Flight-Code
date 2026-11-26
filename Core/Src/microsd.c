@@ -62,6 +62,9 @@ FRESULT MICROSD_WriteTo(const LOGBUF_HandleTypeDef *buf){
   if(fil.obj.fs == NULL){
     return FR_INVALID_OBJECT;
   }
+  if(buf->count == 0){
+    return FR_OK;
+  }
 
   char csv_row[256];
   UINT bw;
@@ -91,21 +94,29 @@ FRESULT MICROSD_WriteTo(const LOGBUF_HandleTypeDef *buf){
     }
     
     fres = f_write(&fil, csv_row, (UINT)len, &bw);
-
     if(fres != FR_OK){
       myprintf("f_write error (%i)\r\n", fres);
       return fres;
     }
   }
-
   return FR_OK;
 }
 
 FRESULT MICROSD_Sync(void){
+  if (fil.obj.fs == NULL) {
+    return FR_INVALID_OBJECT;
+  }
+
   fres = f_sync(&fil);
+
+  if(fres == FR_DISK_ERR || fres = FR_TIMEOUT){
+    fres = f_sync(&fil);
+  }
+
   if(fres != FR_OK){
     myprintf("f_sync error (%i)\r\n", fres);
   }
+
   return fres;
 }
 
